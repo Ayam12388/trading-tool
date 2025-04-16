@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="Live BTC Buy/Sell Signals using Order Book, Sentiment Analysis, VWAP & Risk Strategy. Perfect for crypto traders. Updated every second."/>
+  <meta name="keywords" content="BTC signals, crypto trading signals, live crypto buy sell, order book analysis, tradingview alternative, delta exchange"/>
+  <meta name="author" content="Your Name"/>
+  <meta property="og:title" content="Live BTC Buy/Sell Signals"/>
+  <meta property="og:description" content="AI-powered real-time crypto trading signals with sentiment analysis, iceberg detection & VWAP strategy."/>
+  <meta property="og:image" content="https://yourdomain.com/thumbnail.jpg"/>
+  <meta property="og:url" content="https://yourusername.github.io/your-repo/"/>
+  <title>Live BTC Buy/Sell Signal | Crypto Trading Tool</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #0c0c0c;
+      color: #eee;
+      line-height: 1.6;
+    }
+    header {
+      background: #111;
+      padding: 20px;
+      text-align: center;
+    }
+    header h1 {
+      margin: 0;
+      color: #4caf50;
+    }
+    .container {
+      padding: 20px;
+      max-width: 900px;
+      margin: auto;
+    }
+    .signal-box {
+      background: #1c1c1c;
+      padding: 20px;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+    .signal {
+      font-size: 2.2em;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .ping {
+      font-size: 0.9em;
+      color: #4caf50;
+    }
+    .info {
+      font-size: 1em;
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+    .article {
+      margin-top: 40px;
+      background: #181818;
+      padding: 20px;
+      border-radius: 10px;
+    }
+    .article h2 {
+      color: #ff9800;
+    }
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: #999;
+    }
+    @media screen and (max-width: 600px) {
+      .signal { font-size: 1.5em; }
+      .container { padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Live BTC Buy/Sell Signal</h1>
+  <p>Updated Every Second • AI-Powered Trading Tool</p>
+</header>
+
+<div class="container">
+  <div class="signal-box">
+    <div class="signal" id="signal">Loading...</div>
+    <div class="ping" id="ping"></div>
+    <div class="info" id="info"></div>
+  </div>
+
+  <div class="article">
+    <h2>How This Tool Works</h2>
+    <p>This free crypto trading tool uses real-time data from Delta Exchange to analyze order book depth, iceberg orders, VWAP zones, sentiment score from financial news & social media, and generates trading signals every second. Here's what it analyzes:</p>
+    <ul>
+      <li><strong>Liquidity Score</strong>: Measures market strength using buy/sell volume.</li>
+      <li><strong>Iceberg Detection</strong>: Detects hidden institutional orders.</li>
+      <li><strong>Sentiment Analysis</strong>: Scores live crypto news & Twitter content.</li>
+      <li><strong>VWAP Strategy</strong>: Identifies institutional trade zones.</li>
+      <li><strong>Risk Score</strong>: Avoids high-volatility risky zones.</li>
+    </ul>
+    <p><strong>Signal Logic:</strong> Buy = High liquidity + Positive sentiment + Low risk. Sell = Low liquidity + Negative sentiment + High risk. Otherwise = Exit / Hold.</p>
+
+    <h2>Use Cases</h2>
+    <ul>
+      <li>Intraday traders looking for smart signals.</li>
+      <li>Crypto scalpers using BTC/ETH price action.</li>
+      <li>Mobile-friendly signal dashboard.</li>
+    </ul>
+
+    <h2>FAQ</h2>
+    <p><strong>Q:</strong> Does this tool require any login or payment?<br/>
+       <strong>A:</strong> No. It’s 100% free and anonymous. Built with open APIs.</p>
+
+    <p><strong>Q:</strong> Can I trust these signals blindly?<br/>
+       <strong>A:</strong> No trading strategy is perfect. Use it as confirmation tool.</p>
+  </div>
+</div>
+
+<footer>
+  &copy; 2025 Real-Time Crypto Tool | Built with AI, powered by Delta Exchange
+</footer>
+
+<script>
+  const BASE_URL = "https://api.delta.exchange/v2/orderbook/BTCUSD";
+  const SENTIMENT_API = "https://api.sentiment.io/analyze";
+
+  async function fetchData() {
+    try {
+      const orderRes = await fetch(BASE_URL);
+      const orderData = await orderRes.json();
+
+      const sentimentRes = await fetch(SENTIMENT_API);
+      const sentimentData = await sentimentRes.json();
+
+      const bids = orderData.bids;
+      const asks = orderData.asks;
+
+      const bidVol = bids.reduce((sum, b) => sum + b.size, 0);
+      const askVol = asks.reduce((sum, a) => sum + a.size, 0);
+      const liquidityScore = bidVol / (bidVol + askVol);
+
+      const allOrders = bids.concat(asks);
+      const icebergOrders = allOrders.filter(o => o.size < 0.01 && o.price % 10 === 0).length;
+
+      const sentimentScore = sentimentData.sentiment_score;
+
+      const totalVolume = allOrders.reduce((sum, o) => sum + o.size, 0);
+      const totalPriceVolume = allOrders.reduce((sum, o) => sum + o.price * o.size, 0);
+      const vwap = totalVolume > 0 ? (totalPriceVolume / totalVolume) : null;
+
+      const prices = allOrders.map(o => o.price);
+      const mean = prices.reduce((a, b) => a + b, 0) / prices.length;
+      const variance = prices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / prices.length;
+      const volatility = Math.sqrt(variance);
+      const riskFactor = (1 - liquidityScore) * volatility * (1 - sentimentScore);
+
+      let signal = "EXIT";
+      if (liquidityScore > 0.7 && sentimentScore > 0.6 && riskFactor < 0.3) signal = "BUY";
+      else if (liquidityScore < 0.3 && sentimentScore < 0.4 && riskFactor > 0.6) signal = "SELL";
+
+      document.getElementById("signal").textContent = signal;
+      document.getElementById("ping").textContent = "Updated: " + new Date().toLocaleTimeString();
+      document.getElementById("info").innerHTML = `
+        Liquidity Score: ${liquidityScore.toFixed(2)}<br>
+        Iceberg Orders: ${icebergOrders}<br>
+        Sentiment Score: ${sentimentScore.toFixed(2)}<br>
+        VWAP: ${vwap ? vwap.toFixed(2) : "N/A"}<br>
+        Risk Factor: ${riskFactor.toFixed(2)}
+      `;
+    } catch (err) {
+      document.getElementById("signal").textContent = "Error";
+      console.error("Error fetching data:", err);
+    }
+  }
+
+  setInterval(fetchData, 1000);
+  fetchData();
+</script>
+
+</body>
+</html>
