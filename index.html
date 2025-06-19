@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BTC Futures Net Delta Analytics</title>
+    <style>
+        /* Global reset and touch adjustments */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+            /* touch-action: manipulation; - This can sometimes block clicks, remove or use thoughtfully */
+        }
+        body {
+            font-family: 'Inter', Arial, sans-serif;
+            margin: 0;
+            padding: 20px; /* Updated padding - changed from 'ppxx' to 'px' */
+            background-color: #f5f5f5; /* Fixed typo */
+            -webkit-text-size-adjust: 100%; /* Prevents text scaling on mobile orientation change */
+        }
+        .container {
+            max-width: 1200px; /* Updated max-width */
+            margin: 0 auto;
+            background: white;
+            padding: 20px; /* Updated padding */
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 5px;
+            font-size: 1.5rem; /* Responsive font size */
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 15px;
+            font-size: 0.9rem; /* Responsive font size */
+        }
+        .controls {
+            margin: 15px 0;
+            padding: 15px;
+            background: #eee;
+            border-radius: 5px;
+            display: grid; /* Changed from flex to grid */
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Grid layout */
+            gap: 10px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            flex: 1; /* Gives groups equal space */
+        }
+        .control-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.9rem; /* Responsive font size */
+        }
+        .price-display {
+            text-align: center;
+            font-size: 1.5rem; /* Responsive font size */
+            margin: 15px 0;
+        }
+        .current-price {
+            font-weight: bold;
+            color: #0066cc;
+        }
+        .connection-status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .delta-container {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .delta-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #444;
+            text-align: center;
+            font-size: 1rem; /* Responsive font size */
+        }
+        .delta-value {
+            font-size: 1.5rem; /* Responsive font size */
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+        }
+        .delta-positive {
+            color: #28a745; /* Green color */
+        }
+        .delta-negative {
+            color: #dc3545; /* Red color */
+        }
+        .delta-neutral {
+            color: #17a2b8; /* Blue-green color */
+        }
+        .signal-container {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f0f8ff;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            max-height: 200px; /* Limit height */
+            overflow-y: auto; /* Enable scrolling for signals */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+        }
+        .signal-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #444;
+            text-align: center;
+            position: sticky; /* Keep header visible on scroll */
+            top: 0;
+            background: #f0f8ff;
+            z-index: 1;
+            padding: 5px 0;
+            font-size: 1rem; /* Responsive font size */
+        }
+        .signal-item {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-size: 0.9rem; /* Responsive font size */
+            line-height: 1.4;
+        }
+        .buy-signal {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .sell-signal {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .exit-signal {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .info-signal { /* Added for general info signals */
+            background-color: #e2e3e5;
+            color: #383d41;
+        }
+        .profit-container {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .profit-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #444;
+            text-align: center;
+            font-size: 1rem; /* Responsive font size */
+        }
+        .profit-value {
+            font-size: 1.5rem; /* Responsive font size */
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+        }
+        .profit-positive {
+            color: #28a745;
+        }
+        .profit-negative {
+            color: #dc3545;
+        }
+        .profit-neutral {
+            color: #17a2b8;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Two columns on larger screens */
+            gap: 15px;
+            margin-top: 15px;
+        }
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr; /* Single column on smaller screens */
+            }
+            .controls {
+                flex-direction: column; /* Stack buttons vertically on smaller screens */
+            }
+            .settings-grid {
+                grid-template-columns: 1fr; /* Single column for settings on smaller screens */
+            }
+        }
+        .settings {
+            margin-top: 15px;
+            padding: 15px;
+            background: #eef;
+            border-radius: 5px;
+        }
+        .settings-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #444;
+            font-size: 1rem; /* Responsive font size */
+        }
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Two columns for settings */
+            gap: 10px;
+        }
+        .trade-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap; /* Allow wrapping on small screens */
+        }
+        button {
+            padding: 12px 15px;
+            font-size: 1rem; /* Responsive font size */
+            min-height: 48px; /* Minimum height for touch target */
+            min-width: 100px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1; /* Allows buttons to share space */
+            position: relative;
+            overflow: hidden;
+        }
+        button:active {
+            transform: scale(0.97);
+            opacity: 0.9;
+        }
+        button::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 5px;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.5);
+            opacity: 0;
+            border-radius: 100%;
+            transform: scale(1, 1) translate(-50%, -50%);
+            transform-origin: 50% 50%;
+        }
+        button:active::after {
+            animation: ripple 0.6s ease-out;
+        }
+        @keyframes ripple {
+            0% {
+                transform: scale(0, 0);
+                opacity: 0.5;
+            }
+            100% {
+                transform: scale(20, 20);
+                opacity: 0;
+            }
+        }
+        #connectBtn {
+            background-color: #007bff;
+            color: white;
+        }
+        #pauseBtn {
+            background-color: #6c757d;
+            color: white;
+        }
+        .trade-button {
+            padding: 12px 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            min-width: 120px;
+            font-size: 1rem;
+        }
+        .start-trade {
+            background-color: #28a745;
+            color: white;
+        }
+        .stop-trade {
+            background-color: #dc3545;
+            color: white;
+        }
+        input {
+            padding: 12px;
+            font-size: 1rem; /* Responsive font size */
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            min-height: 48px; /* Minimum height for touch target */
+            width: 100%;
+        }
+        select {
+            padding: 12px;
+            font-size: 1rem; /* Responsive font size */
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            min-height: 48px; /* Minimum height for touch target */
+            width: 100%;
+            background-color: white;
+            appearance: none; /* Remove default arrow */
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-down"><polyline points="6 9 12 15 18 9"></polyline></svg>');
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 16px;
+        }
+        /* Fix for iOS Safari input font size zoom issue */
+        @media screen and (-webkit-min-device-pixel-ratio:0) {
+            select:focus,
+            textarea:focus,
+            input:focus {
+                font-size: 16px;
+            }
+        }
+        .api-key-input {
+            font-family: monospace;
+            font-size: 0.8rem; /* Smaller font for API keys */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>BTC/USDT Futures Net Delta Analytics</h1>
+        <div class="subtitle">30-second rolling window analysis | Net Delta (Aggressive Buy - Aggressive Sell)</div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <button id="connectBtn">Connect</button>
+            </div>
+            
+            <div class="control-group">
+                <button id="pauseBtn">Pause Updates</button>
+            </div>
+        </div>
+        
+        <div class="settings">
+            <div class="settings-header">Trading Parameters</div>
+            <div class="settings-grid">
+                <div class="control-group">
+                    <label for="stopLossInput">Stop Loss ($):</label>
+                    <input type="number" id="stopLossInput" value="10" min="1" step="1" inputmode="numeric">
+                </div>
+                <div class="control-group">
+                    <label for="trailingStopInput">Trailing Stop ($):</label>
+                    <input type="number" id="trailingStopInput" value="20" min="1" step="1" inputmode="numeric">
+                </div>
+                <div class="control-group">
+                    <label for="deltaThresholdInput">Delta Threshold:</label>
+                    <input type="number" id="deltaThresholdInput" value="10" min="1" step="1" inputmode="numeric">
+                </div>
+                <div class="control-group">
+                    <label for="quantityInput">BTC Quantity:</label>
+                    <input type="number" id="quantityInput" value="0.01" min="0.001" step="0.001" inputmode="decimal">
+                </div>
+                <div class="control-group">
+                    <label for="leverageInput">Leverage:</label>
+                    <input type="number" id="leverageInput" value="10" min="1" max="125" step="1" inputmode="numeric">
+                </div>
+                <div class="control-group">
+                    <label for="entryOffsetInput">Entry Offset ($):</label>
+                    <input type="number" id="entryOffsetInput" value="1" min="0" step="0.1" inputmode="decimal">
+                </div>
+                <div class="control-group">
+                    <label for="apiKeyInput">MEXC API Key:</label>
+                    <input type="text" id="apiKeyInput" class="api-key-input" placeholder="Enter your MEXC API Key">
+                </div>
+                <div class="control-group">
+                    <label for="apiSecretInput">MEXC API Secret:</label>
+                    <input type="password" id="apiSecretInput" class="api-key-input" placeholder="Enter your MEXC API Secret">
+                </div>
+                <div class="control-group">
+                    <label for="mexcApiVersionSelect">MEXC API Version:</label>
+                    <select id="mexcApiVersionSelect">
+                        <option value="v1">V1</option>
+                        <option value="v3">V3 (Illustrative - Verify Docs)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="trade-controls">
+                <button id="startTradeBtn" class="trade-button start-trade">Start Trading</button>
+                <button id="stopTradeBtn" class="trade-button stop-trade">Stop Trading</button>
+                <button id="setLeverageBtn" class="trade-button" style="background-color: #17a2b8; color: white;">Set Leverage</button>
+            </div>
+        </div>
+        
+        <div id="connectionStatus" class="connection-status disconnected">
+            Disconnected
+        </div>
+        
+        <div class="price-display">
+            Current Price: <span id="currentPrice" class="current-price">-</span> USDT
+            <div id="priceChange" style="font-size: 1rem;"></div>
+        </div>
+        
+        <div class="delta-container">
+            <div class="delta-header">Net Delta (Aggressive Buy - Aggressive Sell)</div>
+            <div id="netDeltaDisplay" class="delta-value delta-neutral">0</div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="signal-container">
+                <div class="signal-header">Trading Signals</div>
+                <div id="signalList"></div>
+            </div>
+            
+            <div class="profit-container">
+                <div class="profit-header">Trading Performance</div>
+                <div id="profitDisplay" class="profit-value profit-neutral">$0.00</div>
+                <div id="tradeStats" style="text-align: center; font-size: 0.9rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const WS_BASE_URL = "wss://fstream.binance.com/ws/";
+        const MEXC_API_URL = "https://contract.mexc.com"; // Base URL for MEXC API
+        const TIME_WINDOW = 30000; // 30 seconds
+        const SYMBOL = "BTC_USDT";
+        const PING_INTERVAL_MS = 30000; // Ping interval to keep WebSocket alive (30000ms)
+        const RECONNECT_DELAY_MS = 500; // Auto-reconnect wait time after disconnection (500ms)
+        const MIN_EXIT_INTERVAL = 500; // Minimum cool-down period between exit and new entry signal (500ms)
+
+        // New constants for limit order logic
+        const EXIT_LIMIT_FAILURE_OFFSET = 1; // How far price can move past limit exit before market order fallback ($1)
+        const EXIT_ORDER_CHECK_INTERVAL_MS = 200; // How often to check if limit exit order is stuck (200ms)
+        const ENTRY_LIMIT_CANCELLATION_TIMEOUT = 500; // Time to cancel entry limit order if not filled (0.5s)
+
+        // Advanced WebSocket management
+        let socket = null;
+        let tradesData = []; // Stores recent trades for delta calculation
+        let currentPrice = 0;
+        let lastPrice = 0;
+        let isPaused = false;
+        let netDelta = 0;
+        let lastExitTime = 0; // Timestamp of the last exit signal
+        let isTradingActive = false; // Flag to enable/disable automated trading
+        let pingInterval = null;
+        let reconnectTimeout = null;
+        let lastPongTime = Date.now(); 
+        let isManualDisconnect = false;
+        let animationFrameId = null; // To manage the animation frame loop
+        
+        // Trading variables
+        let currentPosition = null; // null or { type: 'buy'/'sell', entryPrice: number, entryTime: number, quantity: number, highWaterMark: number, pendingExitOrderId: string | null, exitLimitPrice: number | null, exitCheckIntervalId: number | null, exitReason: string | null, pendingEntryOrderId: string | null, entryOrderTimeoutId: number | null };
+        let tradeHistory = []; // Stores completed trades
+        let totalProfit = 0;
+        let wins = 0;
+        let losses = 0;
+        
+        // Trading parameters (with defaults)
+        let stopLoss = 10;
+        let trailingStop = 20;
+        let deltaThreshold = 10;
+        let tradeQuantity = 0.01;
+        let leverage = 10;
+        let entryOffset = 1; // New parameter for limit entry offset
+        let apiKey = '';
+        let apiSecret = '';
+        let mexcApiVersion = 'v1'; // Default MEXC API version
+
+        // Performance optimization variables
+        let lastProcessTime = 0;
+        const PROCESS_INTERVAL = 50; // Milliseconds between data processing frames (aiming for ~20 FPS updates)
+        let tradeBuffer = []; // Buffer for incoming WebSocket messages
+
+        // DOM elements
+        const connectBtn = document.getElementById('connectBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const currentPriceElement = document.getElementById('currentPrice');
+        const priceChangeElement = document.getElementById('priceChange');
+        const netDeltaDisplayElement = document.getElementById('netDeltaDisplay');
+        const signalListElement = document.getElementById('signalList');
+        const profitDisplayElement = document.getElementById('profitDisplay');
+        const tradeStatsElement = document.getElementById('tradeStats');
+        const stopLossInput = document.getElementById('stopLossInput');
+        const trailingStopInput = document.getElementById('trailingStopInput');
+        const deltaThresholdInput = document.getElementById('deltaThresholdInput');
+        const quantityInput = document.getElementById('quantityInput');
+        const leverageInput = document.getElementById('leverageInput');
+        const entryOffsetInput = document.getElementById('entryOffsetInput'); // Get new input element
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const apiSecretInput = document.getElementById('apiSecretInput');
+        const mexcApiVersionSelect = document.getElementById('mexcApiVersionSelect');
+        const startTradeBtn = document.getElementById('startTradeBtn');
+        const stopTradeBtn = document.getElementById('stopTradeBtn');
+        const setLeverageBtn = document.getElementById('setLeverageBtn');
+        
+        // --- MEXC API Endpoints and Parameter Configuration ---
+        // IMPORTANT: V3 endpoints and parameters are illustrative.
+        // You MUST verify with MEXC's official V3 documentation for exact values.
+        const mexcApiConfig = {
+            v1: {
+                changeLeverage: {
+                    endpoint: '/api/v1/private/position/change_leverage',
+                    method: 'POST',
+                    params: (symbol, leverage, positionType) => ({
+                        symbol: symbol.replace('_', ''),
+                        leverage: leverage.toString(),
+                        positionType: positionType // 1 for isolated margin
+                    })
+                },
+                placeOrder: {
+                    endpoint: '/api/v1/private/order/submit',
+                    method: 'POST',
+                    params: (symbol, price, vol, side, type, openType, positionId, externalOid) => ({
+                        symbol: symbol.replace('_', ''),
+                        price: price.toFixed(2),
+                        vol: vol.toString(),
+                        side: side, // 1 for buy, 2 for sell
+                        type: type, // 1 for limit, 2 for market
+                        openType: openType, // 2 for isolated margin
+                        positionId: positionId, // 0 for open new position
+                        externalOid: externalOid // unique order ID
+                    })
+                },
+                cancelOrder: {
+                    endpoint: '/api/v1/private/order/cancel',
+                    method: 'POST',
+                    params: (symbol, orderId) => ({
+                        orderId: orderId,
+                        symbol: symbol.replace('_', '')
+                    })
+                },
+                cancelAllOrders: {
+                    endpoint: '/api/v1/private/order/cancel_all',
+                    method: 'POST',
+                    params: (symbol) => ({
+                        symbol: symbol.replace('_', '')
+                    })
+                },
+                placePlanOrder: {
+                    endpoint: '/api/v1/private/planorder/place',
+                    method: 'POST',
+                    params: (symbol, price, vol, side, type, openType, positionId, triggerPrice, externalOid) => ({
+                        symbol: symbol.replace('_', ''),
+                        price: price.toFixed(2),
+                        vol: vol.toString(),
+                        side: side, // 1 for buy, 2 for sell
+                        type: type, // 2 for stop order, 4 for trailing stop
+                        openType: openType, // 2 for isolated margin
+                        positionId: positionId, // 0 for new order
+                        triggerPrice: triggerPrice.toFixed(2),
+                        externalOid: externalOid // unique order ID
+                    })
+                }
+            },
+            v3: { // Illustrative V3 endpoints - VERIFY from MEXC docs
+                changeLeverage: {
+                    endpoint: '/api/v3/private/position/leverage', // Hypothetical
+                    method: 'POST',
+                    params: (symbol, leverage, marginMode) => ({
+                        symbol: symbol.replace('_', ''),
+                        leverage: leverage,
+                        marginMode: marginMode // e.g., 'ISOLATED' or 'CROSSED'
+                    })
+                },
+                placeOrder: {
+                    endpoint: '/api/v3/order', // Hypothetical
+                    method: 'POST',
+                    params: (symbol, price, quantity, side, orderType, marginMode, clientOrderId) => ({
+                        symbol: symbol.replace('_', ''),
+                        price: price.toFixed(2),
+                        quantity: quantity.toString(),
+                        side: side, // e.g., 'BUY' or 'SELL'
+                        orderType: orderType, // e.g., 'LIMIT' or 'MARKET'
+                        marginMode: marginMode,
+                        clientOrderId: clientOrderId
+                    })
+                },
+                cancelOrder: {
+                    endpoint: '/api/v3/order/cancel', // Hypothetical
+                    method: 'DELETE',
+                    params: (symbol, orderId) => ({
+                        symbol: symbol.replace('_', ''),
+                        orderId: orderId
+                    })
+                },
+                cancelAllOrders: {
+                    endpoint: '/api/v3/order/cancelAll', // Hypothetical
+                    method: 'DELETE',
+                    params: (symbol) => ({
+                        symbol: symbol.replace('_', '')
+                    })
+                },
+                placePlanOrder: {
+                    endpoint: '/api/v3/planOrder', // Hypothetical
+                    method: 'POST',
+                    params: (symbol, price, quantity, side, orderType, triggerPrice, clientOrderId) => ({
+                        symbol: symbol.replace('_', ''),
+                        price: price.toFixed(2),
+                        quantity: quantity.toString(),
+                        side: side,
+                        orderType: orderType, // e.g., 'STOP_MARKET' or 'TRAIL_MARKET'
+                        triggerPrice: triggerPrice.toFixed(2),
+                        clientOrderId: clientOrderId
+                    })
+                }
+            }
+        };
+
+        // Helper to get API details based on current version and endpoint type
+        function getApiDetailsForEndpoint(endpointType) {
+            const config = mexcApiConfig[mexcApiVersion];
+            if (!config || !config[endpointType]) {
+                throw new Error(`API configuration not found for version ${mexcApiVersion} or endpoint type ${endpointType}.`);
+            }
+            return config[endpointType];
+        }
+
+        // --- Initialization and Event Listeners ---
+        function setupEventListeners() {
+            // Handle all button interactions for visual feedback
+            const handleInteraction = (button, isActive) => {
+                if (isActive) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            };
+            
+            // Add event listeners to all buttons
+            const buttons = [connectBtn, pauseBtn, startTradeBtn, stopTradeBtn, setLeverageBtn];
+            
+            buttons.forEach(button => {
+                // Mouse events
+                button.addEventListener('mousedown', () => handleInteraction(button, true));
+                button.addEventListener('mouseup', () => handleInteraction(button, false));
+                button.addEventListener('mouseleave', () => handleInteraction(button, false));
+                
+                // Touch events: e.preventDefault() is removed here to allow native 'click' event to fire.
+                // 'passive: true' improves performance and does not block default behavior.
+                button.addEventListener('touchstart', (e) => { 
+                    handleInteraction(button, true);
+                }, { passive: true }); 
+
+                button.addEventListener('touchend', (e) => { 
+                    handleInteraction(button, false);
+                }, { passive: true }); 
+                
+                button.addEventListener('touchcancel', () => handleInteraction(button, false));
+            });
+            
+            // Native click handlers for main functionality (these will work for both mouse and touch clicks)
+            connectBtn.addEventListener('click', toggleConnection);
+            pauseBtn.addEventListener('click', togglePause);
+            startTradeBtn.addEventListener('click', startTrading);
+            stopTradeBtn.addEventListener('click', stopTrading);
+            setLeverageBtn.addEventListener('click', setLeverage);
+            
+            // Input change handlers that update trading parameters instantly
+            stopLossInput.addEventListener('change', updateTradingParams);
+            trailingStopInput.addEventListener('change', updateTradingParams);
+            deltaThresholdInput.addEventListener('change', updateTradingParams);
+            quantityInput.addEventListener('change', updateTradingParams);
+            leverageInput.addEventListener('change', updateTradingParams);
+            entryOffsetInput.addEventListener('change', updateTradingParams); // New input handler
+            apiKeyInput.addEventListener('change', updateTradingParams);
+            apiSecretInput.addEventListener('change', updateTradingParams);
+            mexcApiVersionSelect.addEventListener('change', updateTradingParams);
+
+            // Set initial state for trading buttons
+            stopTradeBtn.disabled = true;
+        }
+        
+        // Updates all trading parameters from input fields
+        function updateTradingParams() {
+            stopLoss = parseFloat(stopLossInput.value);
+            trailingStop = parseFloat(trailingStopInput.value);
+            deltaThreshold = parseFloat(deltaThresholdInput.value);
+            tradeQuantity = parseFloat(quantityInput.value);
+            leverage = parseInt(leverageInput.value);
+            entryOffset = parseFloat(entryOffsetInput.value); // Update entryOffset
+            apiKey = apiKeyInput.value.trim();
+            apiSecret = apiSecretInput.value.trim();
+            mexcApiVersion = mexcApiVersionSelect.value;
+        }
+        
+        // Starts automated trading
+        function startTrading() {
+            updateTradingParams(); // Ensure latest parameters are used
+            if (!apiKey || !apiSecret) {
+                addSignal("API Key/Secret required to start trading.", currentPrice, Date.now(), 'info');
+                return;
+            }
+            
+            isTradingActive = true;
+            startTradeBtn.disabled = true;
+            stopTradeBtn.disabled = false;
+            addSignal("Trading Started.", currentPrice, Date.now(), 'info');
+            
+            // Set leverage when starting trading
+            setLeverage();
+        }
+        
+        // Stops automated trading and closes any open position
+        function stopTrading() {
+            isTradingActive = false;
+            startTradeBtn.disabled = false;
+            stopTradeBtn.disabled = true;
+            addSignal("Trading Stopped.", currentPrice, Date.now(), 'info');
+            
+            // Clear API keys from memory (good security practice)
+            apiKey = '';
+            apiSecret = '';
+            apiKeyInput.value = '';
+            apiSecretInput.value = '';
+            
+            // If an open position exists, close it
+            if (currentPosition) {
+                // Clear any pending entry order timeout
+                if (currentPosition.entryOrderTimeoutId) {
+                    clearTimeout(currentPosition.entryOrderTimeoutId);
+                    currentPosition.entryOrderTimeoutId = null;
+                }
+                // Clear any pending exit order interval
+                if (currentPosition.exitCheckIntervalId) {
+                    clearInterval(currentPosition.exitCheckIntervalId);
+                    currentPosition.exitCheckIntervalId = null;
+                }
+                // Attempt to cancel any pending entry limit order if exists
+                if (currentPosition.pendingEntryOrderId) {
+                    cancelOrder(currentPosition.pendingEntryOrderId);
+                    currentPosition.pendingEntryOrderId = null;
+                }
+                // Attempt to cancel any pending exit limit order if exists
+                if (currentPosition.pendingExitOrderId) {
+                     cancelOrder(currentPosition.pendingExitOrderId);
+                     currentPosition.pendingExitOrderId = null;
+                }
+                // Finally, close the position with a market order for guaranteed exit
+                const profit = currentPosition.type === 'buy' 
+                    ? currentPrice - currentPosition.entryPrice
+                    : currentPosition.entryPrice - currentPrice; // Fixed profit calculation for sell
+                
+                closePosition(currentPrice, Date.now(), profit * currentPosition.quantity * leverage, "Manual Stop", true); // Pass true for immediate market close
+            }
+        }
+        
+        // --- WebSocket Functions for Binance Data Feed ---
+        function setupWebSocket() {
+            // Prevent multiple connections
+            if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)) {
+                return;
+            }
+            
+            const wsUrl = `${WS_BASE_URL}btcusdt@aggTrade`;
+            
+            // Clear any pending reconnection attempts
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+            
+            isManualDisconnect = false; // Reset manual disconnect flag
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = function() {
+                connectionStatus.textContent = "Connected";
+                connectionStatus.className = "connection-status connected";
+                lastPongTime = Date.now();
+                
+                // Set ping interval to keep connection alive
+                if (pingInterval) clearInterval(pingInterval);
+                pingInterval = setInterval(() => {
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        console.log("Checking WebSocket activity...");
+                        if (Date.now() - lastPongTime > PING_INTERVAL_MS * 2) {
+                            console.log("No recent data received, forcing reconnect.");
+                            socket.close(); // Force close to trigger reconnect logic
+                        }
+                    }
+                }, PING_INTERVAL_MS);
+                
+                // Start data processing loop (now triggered directly from onmessage)
+                animationFrameId = requestAnimationFrame(processData); 
+            };
+
+            socket.onclose = function(event) {
+                connectionStatus.textContent = "Disconnected";
+                connectionStatus.className = "connection-status disconnected";
+                connectBtn.textContent = "Connect";
+                
+                // Clear ping interval
+                if (pingInterval) {
+                    clearInterval(pingInterval);
+                    pingInterval = null;
+                }
+                // Cancel animation frame loop
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+
+                // Attempt auto-reconnect if not manual disconnect or clean close
+                if (!isManualDisconnect && !event.wasClean) {
+                    console.log(`WebSocket disconnected (Code: ${event.code}, Reason: ${event.reason || 'No reason'}), reconnecting in ${RECONNECT_DELAY_MS}ms`);
+                    addSignal(`WebSocket disconnected. Reconnecting in ${RECONNECT_DELAY_MS}ms.`, currentPrice, Date.now(), 'info');
+                    reconnectTimeout = setTimeout(setupWebSocket, RECONNECT_DELAY_MS);
+                } else if (isManualDisconnect) {
+                    console.log("WebSocket manually disconnected.");
+                    addSignal("WebSocket manually disconnected.", currentPrice, Date.now(), 'info');
+                } else {
+                    console.log("WebSocket cleanly closed.");
+                    addSignal("WebSocket cleanly closed.", currentPrice, Date.now(), 'info');
+                }
+            };
+
+            socket.onerror = function(error) {
+                console.error(`WebSocket Error: ${error.message || 'Unknown error'}`);
+                addSignal(`WebSocket Error: ${error.message || 'Unknown'}`, currentPrice, Date.now(), 'info');
+            };
+
+            socket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    lastPongTime = Date.now(); // Update last pong time on any message reception
+
+                    // Process trade data from Binance aggTrade stream
+                    if (!isPaused && data.e === 'aggTrade') {
+                        tradeBuffer.push(data); // Add to buffer
+                        // Request immediate processing if not already scheduled for scalping
+                        if (!animationFrameId) { // Only request if not already scheduled
+                            animationFrameId = requestAnimationFrame(processData);
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Error processing message: ${e.message}`);
+                    addSignal(`Error processing WebSocket message: ${e.message}`, currentPrice, Date.now(), 'info');
+                }
+            };
+        }
+
+        // Toggles WebSocket connection status
+        function toggleConnection() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                disconnect();
+            } else {
+                connect();
+            }
+        }
+
+        // Connects to WebSocket
+        function connect() {
+            isManualDisconnect = false;
+            setupWebSocket();
+            connectBtn.textContent = "Disconnect";
+        }
+
+        // Disconnects from WebSocket
+        function disconnect() {
+            isManualDisconnect = true;
+            if (socket) {
+                socket.close();
+            }
+            connectBtn.textContent = "Connect";
+            pauseBtn.textContent = "Pause Updates";
+            isPaused = false;
+        }
+        
+        // Toggles data update pause status
+        function togglePause() {
+            isPaused = !isPaused;
+            pauseBtn.textContent = isPaused ? "Resume Updates" : "Pause Updates";
+        }
+        
+        // --- MEXC API Integration ---
+        // Generates HMAC SHA256 signature for MEXC API requests
+        async function generateSignature(params) {
+            const sortedParams = Object.keys(params)
+                .sort()
+                .map(key => `${key}=${params[key]}`)
+                .join('&');
+            
+            const encoder = new TextEncoder();
+            const key = await crypto.subtle.importKey(
+                'raw',
+                encoder.encode(apiSecret),
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+            const signature = await crypto.subtle.sign(
+                'HMAC',
+                key,
+                encoder.encode(sortedParams)
+            );
+            const hashArray = Array.from(new Uint8Array(signature));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
+        }
+        
+        // Makes signed API calls to MEXC (actual calls)
+        async function callMEXCApi(endpointType, method, params) {
+            if (!apiKey || !apiSecret) {
+                console.error('API Key and Secret are required for MEXC operations.');
+                addSignal('MEXC API: Key/Secret required!', currentPrice, Date.now(), 'info');
+                return null; // Return null to indicate failure
+            }
+
+            try {
+                const apiDetails = getApiDetailsForEndpoint(endpointType);
+                if (!apiDetails) {
+                    addSignal(`MEXC API Error: Configuration not found for version ${mexcApiVersion} or endpoint type ${endpointType}.`, currentPrice, Date.now(), 'info');
+                    return null;
+                }
+
+                const timestamp = Date.now();
+                let requestParams = typeof apiDetails.params === 'function' ? apiDetails.params(...params) : params;
+                
+                // Add timestamp to all parameters for signing
+                requestParams = { ...requestParams, timestamp };
+
+                const signature = await generateSignature(requestParams);
+                
+                const url = new URL(`${MEXC_API_URL}${apiDetails.endpoint}`);
+                Object.entries(requestParams).forEach(([key, value]) => {
+                    url.searchParams.append(key, value);
+                });
+                url.searchParams.append('signature', signature);
+                
+                console.log(`Calling MEXC API (${mexcApiVersion}) for ${endpointType}: ${url.toString()} with method: ${apiDetails.method}`);
+                
+                // --- Actual Fetch Call ---
+                const response = await fetch(url.toString(), {
+                    method: apiDetails.method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ApiKey': apiKey
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    const errorMessage = errorData.msg || errorData.message || `API request failed for ${endpointType} with status ${response.status}`;
+                    console.error(`Error calling MEXC API (${mexcApiVersion}) for ${endpointType}:`, errorMessage);
+                    addSignal(`MEXC API Error (${endpointType}, ${mexcApiVersion}): ${errorMessage}`, currentPrice, Date.now(), 'info');
+                    return { code: -1, message: errorMessage };
+                }
+                
+                const result = await response.json();
+                console.log(`MEXC API Success (${endpointType}, ${mexcApiVersion}):`, result);
+                return result;
+
+            } catch (error) {
+                console.error(`Error calling MEXC API (${mexcApiVersion}) for ${endpointType}: ${error.message}`);
+                addSignal(`MEXC API request error (${endpointType}, ${mexcApiVersion}): ${error.message}`, currentPrice, Date.now(), 'info');
+                return { code: -1, message: error.message };
+            }
+        }
+        
+        // Sets leverage on MEXC
+        async function setLeverage() {
+            updateTradingParams();
+            
+            try {
+                const result = await callMEXCApi(
+                    'changeLeverage',
+                    'POST',
+                    [SYMBOL, leverage, mexcApiVersion === 'v1' ? 1 : 'ISOLATED']
+                );
+                
+                // Successful response from MEXC V1 API should have 'code': 0 and 'data' object
+                if (result && result.code === 0 && result.data) {
+                    addSignal(`Leverage set to ${leverage}x on MEXC (${mexcApiVersion}).`, currentPrice, Date.now(), 'info');
+                    return true;
+                } else {
+                    const errorMsg = result?.message || result?.msg || 'Unknown Error';
+                    addSignal(`Failed to set leverage on MEXC (${mexcApiVersion}): ${errorMsg}`, currentPrice, Date.now(), 'info');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Leverage setting error:', error);
+                addSignal(`Error setting leverage on MEXC (${mexcApiVersion}): ${error.message}`, currentPrice, Date.now(), 'info');
+                return false;
+            }
+        }
+        
+        // Places a limit order on MEXC
+        async function placeLimitOrder(side, price, quantity) {
+            try {
+                const result = await callMEXCApi(
+                    'placeOrder',
+                    'POST',
+                    [SYMBOL, price, quantity, mexcApiVersion === 'v1' ? (side === 'BUY' ? 1 : 2) : side.toUpperCase(), mexcApiVersion === 'v1' ? 1 : 'LIMIT', mexcApiVersion === 'v1' ? 2 : 'ISOLATED', 0, Date.now().toString()] // positionId 0 for open new position for v1
+                );
+            
+                if (result && result.code === 0 && result.data && result.data.orderId) {
+                    console.log(`Placed limit order ${side}: ${quantity} BTC at $${price.toFixed(2)}`);
+                    addSignal(`Placed limit order ${side}: ${quantity} BTC at $${price.toFixed(2)} (Order ID: ${result.data.orderId})`, currentPrice, Date.now(), 'info');
+                    return { success: true, orderId: result.data.orderId };
+                } else {
+                    console.error('Failed to place limit order:', result?.message || result?.msg || 'Unknown Error');
+                    addSignal(`Failed to place limit order (${side}, ${mexcApiVersion}): ${result?.message || result?.msg || 'Unknown Error'}`, currentPrice, Date.now(), 'info');
+                    return { success: false };
+                }
+            } catch (error) {
+                console.error('Error placing limit order:', error);
+                addSignal(`Error placing limit order (${side}, ${mexcApiVersion}): ${error.message}`, currentPrice, Date.now(), 'info');
+                return { success: false };
+            }
+        }
+        
+        // Places a market order on MEXC (kept for guaranteed exits)
+        async function placeMarketOrder(side, quantity) {
+            try {
+                const result = await callMEXCApi(
+                    'placeOrder',
+                    'POST',
+                    [SYMBOL, 0, quantity, mexcApiVersion === 'v1' ? (side === 'BUY' ? 1 : 2) : side.toUpperCase(), mexcApiVersion === 'v1' ? 2 : 'MARKET', mexcApiVersion === 'v1' ? 2 : 'ISOLATED', 0, Date.now().toString()] // positionId 0 for open new position for v1
+                );
+            
+                if (result && result.code === 0 && result.data && result.data.orderId) {
+                    console.log(`Placed market order ${side}: ${quantity} BTC`);
+                    addSignal(`Placed market order ${side}: ${quantity} BTC (Order ID: ${result.data.orderId})`, currentPrice, Date.now(), 'info');
+                    return { success: true, orderId: result.data.orderId };
+                } else {
+                    console.error('Failed to place market order:', result?.message || result?.msg || 'Unknown Error');
+                    addSignal(`Failed to place market order (${side}, ${mexcApiVersion}): ${result?.message || result?.msg || 'Unknown Error'}`, currentPrice, Date.now(), 'info');
+                    return { success: false };
+                }
+            } catch (error) {
+                console.error('Error placing market order:', error);
+                addSignal(`Error placing market order (${side}, ${mexcApiVersion}): ${error.message}`, currentPrice, Date.now(), 'info');
+                return { success: false };
+            }
+        }
+        
+        // Cancels a specific order on MEXC
+        async function cancelOrder(orderId) {
+            try {
+                const result = await callMEXCApi(
+                    'cancelOrder',
+                    mexcApiVersion === 'v1' ? 'POST' : 'DELETE',
+                    [SYMBOL, orderId]
+                );
+            
+                if (result && result.code === 0) { // MEXC V1 does not have data object
+                    console.log(`Order cancelled: ${orderId}`);
+                    addSignal(`Order cancelled: ${orderId}`, currentPrice, Date.now(), 'info');
+                    return { success: true };
+                } else {
+                    console.error('Failed to cancel order:', result?.message || result?.msg || 'Unknown Error');
+                    addSignal(`Failed to cancel order ${orderId} (${mexcApiVersion}): ${result?.message || result?.msg || 'Unknown Error'}`, currentPrice, Date.now(), 'info');
+                    return { success: false };
+                }
+            } catch (error) {
+                console.error('Order cancellation error:', error);
+                addSignal(`Error cancelling order (${mexcApiVersion}): ${error.message}`, currentPrice, Date.now(), 'info');
+                return { success: false };
+            }
+        }
+        
+        // Cancels all open orders for the symbol on MEXC
+        async function cancelAllOrders() {
+            try {
+                const result = await callMEXCApi(
+                    'cancelAllOrders',
+                    mexcApiVersion === 'v1' ? 'POST' : 'DELETE',
+                    [SYMBOL]
+                );
+            
+                if (result && result.code === 0) { // MEXC V1 does not have data object
+                    console.log('All open orders cancelled.');
+                    addSignal('All open orders cancelled.', currentPrice, Date.now(), 'info');
+                    return { success: true };
+                } else {
+                    console.error('Failed to cancel all orders:', result?.message || result?.msg || 'Unknown Error');
+                    addSignal(`Failed to cancel all orders (${mexcApiVersion}): ${result?.message || result?.msg || 'Unknown Error'}`, currentPrice, Date.now(), 'info');
+                    return { success: false };
+                }
+            } catch (error) {
+                console.error('Error cancelling all orders:', error);
+                addSignal(`Error cancelling all orders (${mexcApiVersion}): ${error.message}`, currentPrice, Date.now(), 'info');
+                return { success: false };
+            }
+        }
+        
+        // Places a stop order (stop-limit or stop-market) or trailing stop order on MEXC
+        async function placeStopOrder(side, price, quantity, triggerPrice, isTrailing = false) {
+            try {
+                const result = await callMEXCApi(
+                    'placePlanOrder',
+                    'POST',
+                    [SYMBOL, price, quantity, mexcApiVersion === 'v1' ? (side === 'BUY' ? 1 : 2) : side.toUpperCase(), mexcApiVersion === 'v1' ? (isTrailing ? 4 : 2) : (isTrailing ? 'TRAIL_MARKET' : 'STOP_MARKET'), mexcApiVersion === 'v1' ? 2 : 'ISOLATED', 0, triggerPrice, Date.now().toString()] // positionId 0 for new order, triggerPrice moved
+                );
+            
+                if (result && result.code === 0 && result.data && result.data.orderId) {
+                    console.log(`Placed ${isTrailing ? 'trailing stop' : 'stop'} order for ${side} at trigger: $${triggerPrice.toFixed(2)}`);
+                    addSignal(`Placed ${isTrailing ? 'trailing stop' : 'stop'} order for ${side} at trigger: $${triggerPrice.toFixed(2)} (Order ID: ${result.data.orderId})`, currentPrice, Date.now(), 'info');
+                    return { success: true, orderId: result.data.orderId };
+                } else {
+                    console.error(`Failed to place ${isTrailing ? 'trailing stop' : 'stop'} order:`, result?.message || result?.msg || 'Unknown Error');
+                    addSignal(`Failed to place ${isTrailing ? 'trailing stop' : 'stop'} order (${side}, ${mexcApiVersion}): ${result?.message || result?.msg || 'Unknown Error'}`, currentPrice, Date.now(), 'info');
+                    return { success: false };
+                }
+            } catch (error) {
+                console.error('Error placing stop order:', error);
+                addSignal(`Error placing stop order (${side}, ${mexcApiVersion}): ${error.message}`, currentPrice, Date.now(), 'info');
+                return { success: false };
+            }
+        }
+
+        // --- Trading Logic and Position Management ---
+
+        /**
+         * Opens a new trading position (with actual API calls) using a limit order with an offset.
+         * @param {string} type - 'buy' or 'sell'
+         * @param {number} price - Current market price.
+         * @param {number} quantity - BTC quantity.
+         */
+        async function openPosition(type, price, quantity) {
+            if (currentPosition) {
+                addSignal(`Attempted to open new ${type} position but already in a ${currentPosition.type} position.`, price, Date.now(), 'info');
+                return;
+            }
+
+            let entryLimitPrice;
+            if (type === 'buy') {
+                // For aggressive buy limit, place order slightly above current price
+                entryLimitPrice = price + entryOffset; 
+            } else { // type === 'sell'
+                // For aggressive sell limit, place order slightly below current price
+                entryLimitPrice = price - entryOffset;
+            }
+
+            const orderResult = await placeLimitOrder(type.toUpperCase(), entryLimitPrice, quantity);
+            if (!orderResult.success) {
+                addSignal(`Failed to open ${type} position due to limit order placement failure.`, price, Date.now(), 'sell');
+                return;
+            }
+
+            // Set current position with pending entry order details
+            currentPosition = {
+                type: type,
+                entryPrice: entryLimitPrice, // The price at which the limit order was placed
+                entryTime: Date.now(),
+                quantity: quantity,
+                highWaterMark: entryLimitPrice, // Initial HWM for trailing stop is entry price
+                pendingExitOrderId: null,
+                exitLimitPrice: null,
+                exitCheckIntervalId: null,
+                exitReason: null,
+                pendingEntryOrderId: orderResult.orderId, // Store entry order ID
+                entryOrderTimeoutId: null // Initialize timeout ID
+            };
+            
+            addSignal(`Limit order placed for ${type.toUpperCase()} at $${entryLimitPrice.toFixed(2)}. (Waiting for fill)`, price, Date.now(), type === 'buy' ? 'buy' : 'sell');
+            console.log(`Limit order placed for ${type} at $${entryLimitPrice.toFixed(2)}. (Waiting for fill)`);
+
+            // Set a timeout to cancel entry limit order if not filled within 0.5 seconds
+            currentPosition.entryOrderTimeoutId = setTimeout(async () => {
+                if (currentPosition && currentPosition.pendingEntryOrderId === orderResult.orderId) {
+                    // In a real advanced bot, you would query order status here.
+                    
+                    addSignal(`Entry limit order ${orderResult.orderId} not filled in ${ENTRY_LIMIT_CANCELLATION_TIMEOUT}ms. Cancelling.`, currentPrice, Date.now(), 'info');
+                    await cancelOrder(currentPosition.pendingEntryOrderId); // Use currentPosition.pendingEntryOrderId here
+
+                    // Clear pending entry order details as it's now cancelled/failed to fill
+                    currentPosition.pendingEntryOrderId = null;
+                    currentPosition.entryOrderTimeoutId = null;
+                    currentPosition = null; // Clear position if entry failed
+                    addSignal(`Entry attempt for ${type.toUpperCase()} position failed.`, currentPrice, Date.now(), 'info');
+                }
+            }, ENTRY_LIMIT_CANCELLATION_TIMEOUT);
+
+            lastExitTime = 0; // Reset last exit time after starting a new position
+            updateProfitDisplay(); // Update display (though profit will be 0 initially)
+        }
+
+        /**
+         * Closes the current trading position (with actual API calls).
+         * Prefers a limit order for exit, with a market order fallback if limit gets stuck.
+         * @param {number} exitPrice - The theoretical price at which position triggers to close (e.g., stop loss price).
+         * @param {number} timestamp - Timestamp of the trigger.
+         * @param {number} profit - P/L for this specific trade (considering quantity * leverage).
+         * @param {string} reason - Reason for closing position (e.g., "Stop Loss", "Trailing Stop", "Manual Stop").
+         * @param {boolean} [forceMarket=false] - If true, places a market order directly without attempting limit.
+         */
+        async function closePosition(exitPrice, timestamp, profit, reason, forceMarket = false) {
+            if (!currentPosition) {
+                addSignal("Attempted to close position but no active position found.", exitPrice, timestamp, 'info');
+                return;
+            }
+
+            const { type: positionType, quantity: positionQuantity, entryPrice: positionEntryPrice } = currentPosition;
+            let exitSide = positionType === 'buy' ? 'SELL' : 'BUY'; // Opposite side to close
+
+            // Clear any pending entry order timeout
+            if (currentPosition.entryOrderTimeoutId) {
+                clearTimeout(currentPosition.entryOrderTimeoutId);
+                currentPosition.entryOrderTimeoutId = null;
+            }
+            // Clear any pending entry limit order if exists
+            if (currentPosition.pendingEntryOrderId) {
+                await cancelOrder(currentPosition.pendingEntryOrderId);
+                currentPosition.pendingEntryOrderId = null;
+            }
+
+            // Clear any existing intervals for this position (in case of re-triggering or previous attempt)
+            if (currentPosition.exitCheckIntervalId) {
+                clearInterval(currentPosition.exitCheckIntervalId);
+                currentPosition.exitCheckIntervalId = null;
+            }
+            if (currentPosition.pendingExitOrderId) {
+                 // Attempt to cancel any previously pending exit limit order before new attempt
+                 await cancelOrder(currentPosition.pendingExitOrderId);
+                 currentPosition.pendingExitOrderId = null;
+            }
+
+
+            if (forceMarket) {
+                // Place market order directly (e.g., for manual stop or immediate fallback)
+                addSignal(`${positionType.toUpperCase()} position closing with market order (${reason}).`, currentPrice, Date.now(), 'exit');
+                const marketOrderResult = await placeMarketOrder(exitSide, positionQuantity); 
+                if (marketOrderResult.success) {
+                    const finalProfit = positionType === 'buy'
+                        ? currentPrice - positionEntryPrice
+                        : positionEntryPrice - currentPrice;
+                    const tradePnl = finalProfit * positionQuantity * leverage;
+
+                    totalProfit += tradePnl;
+                    if (tradePnl >= 0) { wins++; } else { losses++; }
+                    tradeHistory.push({
+                        type: positionType,
+                        entryPrice: positionEntryPrice,
+                        entryTime: currentPosition.entryTime,
+                        exitPrice: currentPrice, // Actual market exit price
+                        exitTime: Date.now(),
+                        profit: tradePnl,
+                        reason: `${reason} (Forced Market Exit)`
+                    });
+                    addSignal(`MEXC ${positionType.toUpperCase()} position closed at $${currentPrice.toFixed(2)}. P/L: $${tradePnl.toFixed(2)} (${reason} - Forced Market Exit)`, currentPrice, Date.now(), 'exit');
+                    currentPosition = null; // Position is now officially closed
+                    updateProfitDisplay();
+                } else {
+                    addSignal(`CRITICAL: Failed to force close ${positionType.toUpperCase()} position with market order! Manual intervention required.`, currentPrice, Date.now(), 'sell');
+                }
+                return; // Exit function after forced market order
+            }
+
+            // --- Attempt Limit Order for Exit ---
+            let exitLimitPriceToPlace; // Price for the limit order
+
+            // Calculate limit price for exit order (this is the desired stop/trailing price)
+            // Selling limit to close a buy position, buying limit to close a sell position
+            if (positionType === 'buy') { // Closing a buy position by selling
+                exitLimitPriceToPlace = currentPrice - entryOffset; // Limit sell order slightly below current price
+            } else { // Closing a sell position by buying
+                exitLimitPriceToPlace = currentPrice + entryOffset; // Limit buy order slightly above current price
+            }
+
+
+            const limitOrderResult = await placeLimitOrder(exitSide, exitLimitPriceToPlace, positionQuantity);
+
+            if (limitOrderResult.success) {
+                currentPosition.pendingExitOrderId = limitOrderResult.orderId;
+                currentPosition.exitLimitPrice = exitLimitPriceToPlace;
+                currentPosition.exitReason = reason; // Store original reason
+                
+                addSignal(`Limit order placed for ${exitSide} position at $${exitLimitPriceToPlace.toFixed(2)} (${reason}). Order ID: ${limitOrderResult.orderId}. (Waiting for fill)`, currentPrice, Date.now(), 'exit');
+
+                // Start checking for order fill or fallback
+                currentPosition.exitCheckIntervalId = setInterval(async () => {
+                    if (!currentPosition || currentPosition.pendingExitOrderId === null || currentPosition.exitLimitPrice === null) {
+                        clearInterval(currentPosition.exitCheckIntervalId);
+                        currentPosition.exitCheckIntervalId = null;
+                        return;
+                    }
+
+                    let shouldFallback = false;
+                    // Check if price has moved significantly past the limit order (by EXIT_LIMIT_FAILURE_OFFSET)
+                    if (positionType === 'buy') { // Closing a long position (selling)
+                        // If current price is below limit price by EXIT_LIMIT_FAILURE_OFFSET
+                        // This means the limit sell order at `exitLimitPriceToPlace` is stuck because price has dropped too much.
+                        if (currentPrice <= currentPosition.exitLimitPrice - EXIT_LIMIT_FAILURE_OFFSET) {
+                            shouldFallback = true;
+                        }
+                    } else { // Closing a short position (buying)
+                        // If current price is above limit price by EXIT_LIMIT_FAILURE_OFFSET
+                        // This means the limit buy order at `exitLimitPriceToPlace` is stuck because price has risen too much.
+                        if (currentPrice >= currentPosition.exitLimitPrice + EXIT_LIMIT_FAILURE_OFFSET) {
+                            shouldFallback = true;
+                        }
+                    }
+
+                    if (shouldFallback) {
+                        addSignal(`Limit exit order ${currentPosition.pendingExitOrderId} for ${positionType.toUpperCase()} position stuck, falling back to market order.`, currentPrice, Date.now(), 'exit');
+                        
+                        clearInterval(currentPosition.exitCheckIntervalId);
+                        currentPosition.exitCheckIntervalId = null;
+
+                        await cancelOrder(currentPosition.pendingExitOrderId);
+                        currentPosition.pendingExitOrderId = null; // Clear pending order ID
+
+                        const marketOrderResult = await placeMarketOrder(exitSide, positionQuantity); 
+
+                        if (marketOrderResult.success) {
+                            const finalProfit = positionType === 'buy'
+                                ? currentPrice - positionEntryPrice
+                                : positionEntryPrice - currentPrice;
+                            const tradePnl = finalProfit * positionQuantity * leverage;
+
+                            totalProfit += tradePnl;
+                            if (tradePnl >= 0) { wins++; } else { losses++; }
+                            tradeHistory.push({
+                                type: positionType,
+                                entryPrice: positionEntryPrice,
+                                entryTime: currentPosition.entryTime,
+                                exitPrice: currentPrice, // Actual market exit price
+                                exitTime: Date.now(),
+                                profit: tradePnl,
+                                reason: `${currentPosition.exitReason} (Market Fallback)`
+                            });
+
+                            addSignal(`MEXC ${positionType.toUpperCase()} position closed at $${currentPrice.toFixed(2)}. P/L: $${tradePnl.toFixed(2)} (${currentPosition.exitReason} - Market Fallback)`, currentPrice, Date.now(), 'exit');
+                            currentPosition = null;
+                            updateProfitDisplay();
+                        } else {
+                            addSignal(`CRITICAL: Failed to place market order for ${positionType.toUpperCase()} position fallback exit! Manual intervention required.`, currentPrice, Date.now(), 'sell');
+                        }
+                    }
+                }, EXIT_ORDER_CHECK_INTERVAL_MS);
+
+            } else {
+                // If initial limit order placement fails, immediately fall back to market order
+                addSignal(`Initial limit order placement failed for ${positionType.toUpperCase()} position exit. Falling back to market order.`, exitPrice, timestamp, 'sell');
+                const marketOrderResult = await placeMarketOrder(exitSide, positionQuantity); 
+                if (marketOrderResult.success) {
+                    const finalProfit = positionType === 'buy'
+                        ? exitPrice - positionEntryPrice
+                        : positionEntryPrice - exitPrice;
+                    const tradePnl = finalProfit * positionQuantity * leverage;
+
+                    totalProfit += tradePnl;
+                    if (tradePnl >= 0) { wins++; } else { losses++; }
+                    tradeHistory.push({
+                        type: positionType,
+                        entryPrice: positionEntryPrice,
+                        entryTime: currentPosition.entryTime,
+                        exitPrice: exitPrice, // Original exit price for record
+                        exitTime: Date.now(),
+                        profit: tradePnl,
+                        reason: `${reason} (Market Fallback due to Limit Order Failure)`
+                    });
+                    addSignal(`MEXC ${positionType.toUpperCase()} position closed at $${exitPrice.toFixed(2)}. P/L: $${tradePnl.toFixed(2)} (${reason} - Market Fallback)`, exitPrice, Date.Now(), 'exit');
+                    currentPosition = null;
+                    updateProfitDisplay();
+                } else {
+                    addSignal(`CRITICAL: Failed to close ${positionType.toUpperCase()} position with market order fallback! Manual intervention required.`, exitPrice, timestamp, 'sell');
+                }
+            }
+        }
+
+        /**
+         * Adds a new signal message to the signal list display.
+         * @param {string} message - The signal message.
+         * @param {number} price - The price at which the signal occurred.
+         * @param {number} timestamp - Timestamp of the signal.
+         * @param {string} type - 'buy', 'sell', 'exit', or 'info' for styling.
+         */
+        function addSignal(message, price, timestamp, type = 'info') {
+            const signalItem = document.createElement('div');
+            signalItem.classList.add('signal-item');
+            signalItem.classList.add(`${type}-signal`);
+            
+            const time = new Date(timestamp).toLocaleTimeString();
+            signalItem.innerHTML = `<strong>[${time}]</strong> ${message} <br> Price: ${price.toFixed(2)}`;
+            
+            signalListElement.prepend(signalItem);
+            
+            // Keep only the last 20 signals to prevent excessive DOM elements
+            while (signalListElement.children.length > 20) {
+                signalListElement.removeChild(signalListElement.lastChild);
+            }
+        }
+
+        // Updates the displayed profit and trade statistics
+        function updateProfitDisplay() {
+            profitDisplayElement.textContent = `$${totalProfit.toFixed(2)}`;
+            if (totalProfit > 0) {
+                profitDisplayElement.className = "profit-value profit-positive";
+            } else if (totalProfit < 0) {
+                profitDisplayElement.className = "profit-value profit-negative";
+            } else {
+                profitDisplayElement.className = "profit-value profit-neutral";
+            }
+
+            const winRate = (wins + losses) > 0 ? ((wins / (wins + losses)) * 100).toFixed(2) : 0;
+            tradeStatsElement.textContent = `Wins: ${wins} | Losses: ${losses} | Win Rate: ${winRate}%`;
+        }
+
+        // --- Core Data Processing Loop ---
+        /**
+         * Processes buffered trade data and updates analytics/trading logic.
+         * This function is called via requestAnimationFrame for smoother UI updates.
+         */
+        function processData() {
+            const now = performance.now();
+
+            // If paused, or if no new trades and not enough time has passed for general UI update,
+            // just reschedule and return. This prevents unnecessary processing when nothing is happening.
+            if (isPaused || (tradeBuffer.length === 0 && now - lastProcessTime < PROCESS_INTERVAL)) {
+                animationFrameId = requestAnimationFrame(processData);
+                return;
+            }
+
+            lastProcessTime = now;
+            let currentBuyVolume = 0;
+            let currentSellVolume = 0;
+            let lastTradePrice = currentPrice;
+
+            // Process all trades accumulated in the buffer immediately
+            while (tradeBuffer.length > 0) {
+                const trade = tradeBuffer.shift(); // Get and remove the oldest trade from the buffer
+                const price = parseFloat(trade.p);
+                const quantity = parseFloat(trade.q);
+                const tradeTime = trade.T;
+
+                tradesData.push({ price: price, quantity: quantity, isBuyerMaker: trade.m, time: tradeTime });
+                lastTradePrice = price; // Always update with the latest price from the buffer
+            }
+
+            currentPrice = lastTradePrice; // Update current price display
+
+            // Filter out old trades that are outside the time window
+            const timeCutoff = Date.now() - TIME_WINDOW;
+            tradesData = tradesData.filter(trade => trade.time > timeCutoff);
+
+            // Calculate net delta from remaining trades
+            tradesData.forEach(trade => {
+                if (trade.isBuyerMaker) { // Aggressive Buy
+                    currentBuyVolume += trade.quantity;
+                } else { // Aggressive Sell
+                    currentSellVolume += trade.quantity;
+                }
+            });
+
+            // UPDATED: Net Delta calculation is now (Aggressive Sell Volume - Aggressive Buy Volume)
+            // to match your 'tested code' logic where positive delta implies more sell pressure.
+            netDelta = currentSellVolume - currentBuyVolume; 
+
+            // --- Update UI ---
+            currentPriceElement.textContent = currentPrice.toFixed(2);
+            
+            // Price change indicator
+            if (lastPrice !== 0 && currentPrice !== 0) {
+                const change = currentPrice - lastPrice;
+                priceChangeElement.textContent = `${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(2)}`;
+                priceChangeElement.style.color = change >= 0 ? '#28a745' : '#dc3545';
+            }
+            lastPrice = currentPrice;
+
+            netDeltaDisplayElement.textContent = netDelta.toFixed(2);
+            // Net Delta UI color: Now aligns with your request - positive delta is green, negative delta is red.
+            // Positive netDelta (more aggressive sell volume) will be green.
+            // Negative netDelta (more aggressive buy volume) will be red.
+            if (netDelta > deltaThreshold) { // If net delta is greater than deltaThreshold (default 10), then Green (indicating strong sell pressure)
+                netDeltaDisplayElement.className = "delta-value delta-positive"; 
+            } else if (netDelta < -deltaThreshold) { // If net delta is less than -deltaThreshold (default -10), then Red (indicating strong buy pressure)
+                netDeltaDisplayElement.className = "delta-value delta-negative"; 
+            } else {
+                netDeltaDisplayElement.className = "delta-value delta-neutral"; // Neutral
+            }
+
+            // --- Automated Trading Logic ---
+            // Respect minimum cool-down period for new entry signals after an exit signal
+            if (isTradingActive && Date.now() - lastExitTime > MIN_EXIT_INTERVAL) { 
+                if (!currentPosition) {
+                    // Check for new entry signals
+                    // Buy Signal: When net delta is greater than deltaThreshold (default 10) (This now indicates strong aggressive SELL pressure, as per your tested code logic)
+                    if (netDelta > deltaThreshold) { 
+                        openPosition('buy', currentPrice, tradeQuantity);
+                    } 
+                    // Sell Signal: When net delta is less than -deltaThreshold (default -10) (This now indicates strong aggressive BUY pressure, as per your tested code logic)
+                    else if (netDelta < -deltaThreshold) { 
+                        openPosition('sell', currentPrice, tradeQuantity);
+                    }
+                } else {
+                    // Manage existing position (Stop Loss / Trailing Stop)
+                    if (currentPosition.type === 'buy') {
+                        // Update high water mark for trailing stop
+                        currentPosition.highWaterMark = Math.max(currentPosition.highWaterMark, currentPrice);
+
+                        // Check for Stop Loss
+                        if (currentPrice <= currentPosition.entryPrice - stopLoss) {
+                            // Calculate P/L based on quantity and leverage
+                            closePosition(currentPrice, Date.now(), (currentPrice - currentPosition.entryPrice) * currentPosition.quantity * leverage, "Stop Loss");
+                        }
+                        // Check for Trailing Stop
+                        else if (currentPrice <= currentPosition.highWaterMark - trailingStop) {
+                            // Calculate P/L based on quantity and leverage
+                            closePosition(currentPrice, Date.now(), (currentPrice - currentPosition.entryPrice) * currentPosition.quantity * leverage, "Trailing Stop");
+                        }
+                    } else if (currentPosition.type === 'sell') {
+                        // Update high water mark (lower value) for trailing stop
+                        currentPosition.highWaterMark = Math.min(currentPosition.highWaterMark, currentPrice);
+
+                        // Check for Stop Loss
+                        if (currentPrice >= currentPosition.entryPrice + stopLoss) {
+                            // Calculate P/L based on quantity and leverage
+                            closePosition(currentPrice, Date.now(), (currentPosition.entryPrice - currentPrice) * currentPosition.quantity * leverage, "Stop Loss");
+                        }
+                        // Check for Trailing Stop
+                        else if (currentPrice >= currentPosition.highWaterMark + trailingStop) {
+                            // Calculate P/L based on quantity and leverage
+                            closePosition(currentPrice, Date.Now(), (currentPosition.entryPrice - currentPrice) * currentPosition.quantity * leverage, "Trailing Stop"); 
+                        }
+                    }
+                }
+            }
+            
+            // Schedule the next frame
+            animationFrameId = requestAnimationFrame(processData);
+        }
+
+        // Run setup when DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                console.log('DOM content loaded. Initializing app...');
+                setupEventListeners();
+                updateTradingParams(); // Load initial values from inputs
+                updateProfitDisplay(); // Initialize profit display
+                // Attempt to connect WebSocket automatically on page load
+                connect(); 
+            } catch (e) {
+                console.error('Initialization Error:', e);
+                // Display fallback error message to user if initialization fails
+                const statusElement = document.getElementById('connectionStatus');
+                if (statusElement) {
+                    statusElement.textContent = `Initialization Error: ${e.message}. Please check console for details.`;
+                    statusElement.className = "connection-status disconnected";
+                }
+            }
+        });
+    </script>
+</body>
+</html>
